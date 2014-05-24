@@ -36,6 +36,8 @@ typedef long long int64_t;
 #  include <assert.h>
 #endif
 
+# include <memory.h>
+
 
 // ----------------------------------------------------------------------------
 
@@ -62,6 +64,61 @@ void kernelConfigAdjust(int &numThreads, int &numBlockX, int &numBlockY, const i
 		numBlockX = numBlockXMax;
 	}
 }
+
+template <typename T>
+class ManagedVector {
+	T*     m_p_array;
+	size_t m_size;
+
+public:
+	ManagedVector(): m_p_array(0), m_size(0) {}
+	ManagedVector(size_t n): m_size(n) {
+		cudaMallocManaged(&m_p_array, sizeof(T) * n);
+	}
+	ManagedVector(size_t n, T val): m_size(n) {
+		cudaMallocManaged(&m_p_array, sizeof(T) * n);
+		for (int i = 0; i < n; i++)
+			m_p_array[i] = val;
+	}
+	ManagedVector(const ManagedVector &a): m_size(a.m_size) {
+		cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
+		memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+	}
+	~ManagedVector() {cudaFree(m_p_array);}
+
+	ManagedVector& operator=(const ManagedVector &a) {
+		m_size = a.m_size;
+		cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
+		memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+
+		return *this;
+	}
+
+	T *begin() const {return m_p_array;}
+	T *end()   const {return m_p_array + m_size;}
+
+	T& operator[](size_t n)    {return m_p_array[n];}
+	const T& operator[](size_t n)  const  {return m_p_array[n];}
+
+	size_t size() const {return m_size;}
+
+	void resize(size_t n)  {
+		if (m_size >= n) m_size = n;
+		else {
+			T *p_tmp;
+			cudaMallocManaged(&p_tmp, sizeof(T) * n);
+
+			if (m_size > 0)
+				memcpy(p_tmp, m_p_array, sizeof(T) * m_size);
+
+			m_size = n;
+			cudaFree(m_p_array);
+
+			m_p_array = p_tmp;
+		}
+	}
+
+};
 
 
 } // namespace spike

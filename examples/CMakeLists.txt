@@ -44,10 +44,12 @@ include_directories(..)
 SET(MC64_HEADERS
 	../../mc64/mc64.h
 	../../mc64/common.h
+	../../mc64/timer.h
 )
 
 SET(MC64_CUHEADERS
 	../../mc64/device/mc64.cuh
 )
 
-ADD_SUBDIRECTORY(mc64)
+ADD_SUBDIRECTORY(new_mc64)
+ADD_SUBDIRECTORY(old_mc64)

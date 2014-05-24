@@ -5,6 +5,7 @@
 #include <thrust/device_vector.h>
 
 #include <mc64/mc64.h>
+#include <mc64/timer.h>
 
 using std::cout;
 using std::cin;
@@ -12,16 +13,19 @@ using std::endl;
 using std::string;
 using std::vector;
 
-typedef typename thrust::host_vector<int>     IntVector;
-typedef typename thrust::host_vector<double>  DoubleVector;
+typedef typename thrust::host_vector<int>     IntVectorH;
+typedef typename thrust::host_vector<double>  DoubleVectorH;
+
+typedef typename mc64::ManagedVector<int>     IntVector;
+typedef typename mc64::ManagedVector<double>  DoubleVector;
 
 int main(int argc, char **argv)
 {
 	size_t        N, nnz;
 
-	IntVector     row_offsets;
-	IntVector     column_indices;
-	DoubleVector  values;
+	IntVectorH    row_offsets;
+	IntVectorH    column_indices;
+	DoubleVectorH values;
 
 	std::ifstream  fin;
 
@@ -34,6 +38,7 @@ int main(int argc, char **argv)
 	}
 
 	fin >> N >> nnz;
+
 	row_offsets.resize(N + 1);
 	column_indices.resize(nnz);
 	values.resize(nnz);
@@ -51,9 +56,12 @@ int main(int argc, char **argv)
 
 	mc64::OldMC64 oldMC64(row_offsets, column_indices, values);
 
-	oldMC64.print(cout);
 	oldMC64.execute();
-	oldMC64.print(cout);
+	cout << oldMC64.getTimeTotal() << endl;
+	cout << oldMC64.getTimePre() << endl;
+	cout << oldMC64.getTimeFirst() << endl;
+	cout << oldMC64.getTimeSecond() << endl;
+	cout << oldMC64.getTimePost() << endl;
 
 	return 0;
 }
