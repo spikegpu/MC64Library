@@ -20,6 +20,7 @@
 
 #include <mc64/common.h>
 #include <mc64/timer.h>
+#include <mc64/exception.h>
 #include <mc64/device/mc64.cuh>
 
 namespace mc64  {
@@ -199,10 +200,8 @@ OldMC64::execute(bool scale)
 			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, rowScale, colScale, c_val, irn);
 		}
 
-		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>())) {
-			fprintf(stderr, "Singular matrix found\n");
-			exit(-1);
-		}
+		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>())) 
+			throw system_error(system_error::Matrix_singular, "Singular matrix found\n");
 
 		DoubleVectorH max_val_in_col  = d_max_val_in_col;
 		thrust::transform(rowScale.begin(), rowScale.end(), rowScale.begin(), Exponential());
@@ -383,10 +382,9 @@ OldMC64::findShortestAugPath(int                   init_node,
 			if(inB[cur_row]) continue;
 			if(c_val[i] > LOC_INFINITY / 2.0) continue;
 			double reduced_cval = c_val[i] - u_val[cur_row] - v_val[cur_node];
-			if (reduced_cval + 1e-10 < 0) {
-				fprintf(stderr, "Negative reduced weight in MC64\n");
-				exit(-1);
-			}
+			if (reduced_cval + 1e-10 < 0)
+				throw system_error(system_error::Negative_MC64_weight, "Negative reduced weight in MC64");
+
 			double d_new = lsp + reduced_cval;
 			if(d_new < lsap) {
 				if(!matched[cur_row]) {
@@ -698,10 +696,8 @@ NewMC64::execute(bool scale)
 			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, rowScale, colScale, c_val, irn);
 		}
 
-		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>())) {
-			fprintf(stderr, "Singular matrix found\n");
-			exit(-1);
-		}
+		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>()))
+			throw system_error(system_error::Matrix_singular, "Singular matrix found");
 
 		thrust::transform(rowScale.begin(), rowScale.end(), rowScale.begin(), Exponential());
 		thrust::transform(thrust::make_transform_iterator(colScale.begin(), Exponential()),
@@ -793,7 +789,7 @@ NewMC64::formBipartiteGraph(DoubleVector& c_val, DoubleVector& max_val_in_col)
 	dim3 grids(blockX, blockY);
 
 	device::getResidualValues<<<grids, 64>>>(m_n, p_c_val, p_max_val, p_row_offsets); 
-	gpu_timer.Stop();
+	cudaDeviceSynchronize();
 }
 
 void
@@ -878,10 +874,9 @@ NewMC64::findShortestAugPath(int                  init_node,
 			if(inB[cur_row]) continue;
 			if(c_val[i] > LOC_INFINITY / 2.0) continue;
 			double reduced_cval = c_val[i] - u_val[cur_row] - v_val[cur_node];
-			if (reduced_cval + 1e-10 < 0) {
-				fprintf(stderr, "Negative reduced weight in MC64\n");
-				exit(-1);
-			}
+			if (reduced_cval + 1e-10 < 0) 
+				throw system_error(system_error::Negative_MC64_weight, "Negative reduced weight in MC64");
+
 			double d_new = lsp + reduced_cval;
 			if(d_new < lsap) {
 				if(!matched[cur_row]) {

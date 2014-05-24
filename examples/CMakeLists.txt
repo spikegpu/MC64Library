@@ -45,6 +45,7 @@ SET(MC64_HEADERS
 	../../mc64/mc64.h
 	../../mc64/common.h
 	../../mc64/timer.h
+	../../mc64/exception.h
 )
 
 SET(MC64_CUHEADERS

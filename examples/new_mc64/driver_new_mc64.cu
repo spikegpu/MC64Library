@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <fstream>
 #include <cmath>
+#include <string>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
@@ -19,9 +20,45 @@ typedef typename thrust::host_vector<double>  DoubleVectorH;
 typedef typename mc64::ManagedVector<int>     IntVector;
 typedef typename mc64::ManagedVector<double>  DoubleVector;
 
+// Color to print
+enum TestColor {COLOR_NO = 0,
+                COLOR_RED,
+                COLOR_GREEN} ;
+
+class OutputItem
+{
+public:
+	OutputItem(std::ostream &o): m_o(o), m_additional_item_count(19) {}
+
+	int           m_additional_item_count;
+
+	template <typename T>
+	void operator() (T item, TestColor c = COLOR_NO) {
+		m_o << "<td style=\"border-style: inset;\">\n";
+		switch (c)
+		{
+			case COLOR_RED:
+				m_o << "<p> <FONT COLOR=\"Red\">" << item << " </FONT> </p>\n";
+				break;
+
+			case COLOR_GREEN:
+				m_o << "<p> <FONT COLOR=\"Green\">" << item << " </FONT> </p>\n";
+				break;
+
+			default:
+				m_o << "<p> " << item << " </p>\n";
+				break;
+		}
+		m_o << "</td>\n";
+	}
+private:
+	std::ostream &m_o;
+};
+
 int main(int argc, char **argv)
 {
 	size_t        N, nnz;
+	std::string   fileMat;
 
 	IntVector     row_offsets_managed;
 	IntVector     column_indices_managed;
@@ -37,7 +74,7 @@ int main(int argc, char **argv)
 			return 1;
 	}
 
-	fin >> N >> nnz;
+	fin >> fileMat >> N >> nnz;
 
 	row_offsets_managed.resize(N + 1);
 	column_indices_managed.resize(nnz);
@@ -54,15 +91,41 @@ int main(int argc, char **argv)
 
 	fin.close();
 
+	OutputItem outputItem(cout);
+
+	cout << "<tr valign=top>" << endl;
+
+	outputItem(fileMat);
+
+	outputItem(N);
+
+	outputItem(nnz);
+
 	mc64::NewMC64 newMC64(row_offsets_managed, column_indices_managed, values_managed);
 
-	newMC64.execute();
+	try {
+		newMC64.execute();
+	} catch (const mc64::system_error& se) {
+		outputItem("");
+		outputItem("");
+		outputItem("");
+		outputItem("");
+		outputItem("");
 
-	cout << newMC64.getTimeTotal() << endl;
-	cout << newMC64.getTimePre() << endl;
-	cout << newMC64.getTimeFirst() << endl;
-	cout << newMC64.getTimeSecond() << endl;
-	cout << newMC64.getTimePost() << endl;
+		return 1;
+	}
+
+	outputItem(newMC64.getTimePre());
+
+	outputItem(newMC64.getTimeFirst());
+
+	outputItem(newMC64.getTimeSecond());
+
+	outputItem(newMC64.getTimePost());
+
+	outputItem(newMC64.getTimeTotal());
+
+	cout << "</tr>" << endl;
 
 	return 0;
 }
