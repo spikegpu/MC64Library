@@ -4,11 +4,16 @@
 #include <string>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
+#include <thrust/system/omp/execution_policy.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 #include <mc64/mc64.h>
 #include <mc64/timer.h>
 
 using std::cout;
+using std::cerr;
 using std::cin;
 using std::endl;
 using std::string;
@@ -24,6 +29,33 @@ typedef typename mc64::ManagedVector<double>  DoubleVector;
 enum TestColor {COLOR_NO = 0,
                 COLOR_RED,
                 COLOR_GREEN} ;
+
+template <typename T>
+__global__
+void gpuAdd(T *a, T *b, int N)
+{
+	int idx = threadIdx.x + blockIdx.x * blockDim.x;
+	if (idx >= N) return;
+	a[idx] += b[idx];
+}
+
+template <typename T>
+struct AbsoluteValue
+{
+	inline
+	__host__ __device__
+	T operator() (T a) {return (a < 0 ? (-a) : a);}
+};
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
+{
+	if (code != cudaSuccess) 
+	{
+		fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+		if (abort) exit(code);
+	}
+}
 
 class OutputItem
 {

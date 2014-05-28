@@ -37,6 +37,7 @@ typedef long long int64_t;
 #endif
 
 # include <memory.h>
+# include <thrust/device_ptr.h>
 
 
 // ----------------------------------------------------------------------------
@@ -87,15 +88,21 @@ public:
 	~ManagedVector() {cudaFree(m_p_array);}
 
 	ManagedVector& operator=(const ManagedVector &a) {
-		m_size = a.m_size;
-		cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
-		memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+		if (m_size < a.m_size) {
+			m_size = a.m_size;
+			cudaFree(m_p_array);
+			cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
+			memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+		} else {
+			m_size = a.m_size;
+			memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+		}
 
 		return *this;
 	}
 
-	T *begin() const {return m_p_array;}
-	T *end()   const {return m_p_array + m_size;}
+	thrust::device_ptr<T> begin() const {return thrust::device_pointer_cast(&m_p_array[0]);}
+	thrust::device_ptr<T> end()   const {return thrust::device_pointer_cast(&m_p_array[m_size]);}
 
 	T& operator[](size_t n)    {return m_p_array[n];}
 	const T& operator[](size_t n)  const  {return m_p_array[n];}

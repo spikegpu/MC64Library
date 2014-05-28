@@ -17,6 +17,7 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/binary_search.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 #include <mc64/common.h>
 #include <mc64/timer.h>
@@ -559,6 +560,7 @@ private:
 				thrust::counting_iterator<int>(offsets.size()-1),
 				offsets.begin(),
 				indices.begin());
+		//// thrust::inclusive_scan(thrust::cuda::par, indices.begin(), indices.end(), indices.begin(), thrust::maximum<int>());
 		thrust::inclusive_scan(indices.begin(), indices.end(), indices.begin(), thrust::maximum<int>());
 	}
 
@@ -706,12 +708,15 @@ NewMC64::execute(bool scale)
 				colScale.begin(),
 				thrust::divides<double>());
 
+		cudaDeviceSynchronize();
 	}
 	cpu_timer.Stop();
 	m_time_second = cpu_timer.getElapsed();
 
 	cpu_timer.Start();
 	thrust::scatter(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(m_n), rowReordering.begin(), m_rowPerm.begin());
+
+	cudaDeviceSynchronize();
 
 	IntVector&    rowPerm  = m_rowPerm;
 	IntVector     row_indices(m_nnz);
@@ -737,16 +742,19 @@ NewMC64::execute(bool scale)
 				row_indices[l] = new_row;
 		}
 	}
+	cudaDeviceSynchronize();
 
 	{
 		IntVector& row_offsets = m_row_offsets;
 		IntVector  column_indices(m_nnz);
 
 		thrust::fill(row_offsets.begin(), row_offsets.end(), 0);
+		cudaDeviceSynchronize();
 		for (int i = 0; i < m_nnz; i++)
 			row_offsets[row_indices[i]] ++;
 
 		thrust::inclusive_scan(row_offsets.begin(), row_offsets.end(), row_offsets.begin());
+		cudaDeviceSynchronize();
 
 		for (int i = m_nnz - 1; i >= 0; i--) {
 			int idx = (--row_offsets[row_indices[i]]);
@@ -808,6 +816,8 @@ NewMC64::initPartialMatch(DoubleVector& c_val,
 	}
 
 	thrust::fill(colScale.begin(), colScale.end(), LOC_INFINITY);
+	cudaDeviceSynchronize();
+
 	for(int i = 0; i < m_n; i++) {
 		int start_idx = m_row_offsets[i], end_idx = m_row_offsets[i+1];
 		int min_idx = -1;
@@ -833,6 +843,7 @@ NewMC64::initPartialMatch(DoubleVector& c_val,
 
 	thrust::transform_if(rowScale.begin(), rowScale.end(), matched.begin(), rowScale.begin(), ClearValue(), thrust::logical_not<bool>());
 	thrust::transform_if(colScale.begin(), colScale.end(), rev_matched.begin(), colScale.begin(), ClearValue(), thrust::logical_not<bool>());
+	cudaDeviceSynchronize();
 }
 
 void
