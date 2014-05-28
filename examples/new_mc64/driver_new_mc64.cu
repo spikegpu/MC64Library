@@ -30,32 +30,6 @@ enum TestColor {COLOR_NO = 0,
                 COLOR_RED,
                 COLOR_GREEN} ;
 
-template <typename T>
-__global__
-void gpuAdd(T *a, T *b, int N)
-{
-	int idx = threadIdx.x + blockIdx.x * blockDim.x;
-	if (idx >= N) return;
-	a[idx] += b[idx];
-}
-
-template <typename T>
-struct AbsoluteValue
-{
-	inline
-	__host__ __device__
-	T operator() (T a) {return (a < 0 ? (-a) : a);}
-};
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
-{
-	if (code != cudaSuccess) 
-	{
-		fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-		if (abort) exit(code);
-	}
-}
 
 class OutputItem
 {
