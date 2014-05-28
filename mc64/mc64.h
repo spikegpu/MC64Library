@@ -188,7 +188,7 @@ OldMC64::execute(bool scale)
 	IntVectorH    rev_match_nodes(m_nnz);
 	BoolVectorH   matched(m_n, 0);
 	BoolVectorH   rev_matched(m_n, 0);
-	initPartialMatch(c_val, rowScale, colScale, rowReordering, rev_match_nodes, matched, rev_matched);
+	initPartialMatch(c_val, colScale, rowScale, rowReordering, rev_match_nodes, matched, rev_matched);
 	cpu_timer.Stop();
 	m_time_first = cpu_timer.getElapsed();
 
@@ -198,18 +198,18 @@ OldMC64::execute(bool scale)
 		IntVectorH    prev(m_n);
 		for (int i = 0; i < m_n; i++) {
 			if(rev_matched[i]) continue;
-			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, rowScale, colScale, c_val, irn);
+			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, colScale, rowScale, c_val, irn);
 		}
 
 		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>())) 
 			throw system_error(system_error::Matrix_singular, "Singular matrix found\n");
 
 		DoubleVectorH max_val_in_col  = d_max_val_in_col;
-		thrust::transform(rowScale.begin(), rowScale.end(), rowScale.begin(), Exponential());
-		thrust::transform(thrust::make_transform_iterator(colScale.begin(), Exponential()),
-				thrust::make_transform_iterator(colScale.end(), Exponential()),
+		thrust::transform(colScale.begin(), colScale.end(), colScale.begin(), Exponential());
+		thrust::transform(thrust::make_transform_iterator(rowScale.begin(), Exponential()),
+				thrust::make_transform_iterator(rowScale.end(), Exponential()),
 				max_val_in_col.begin(),
-				colScale.begin(),
+				rowScale.begin(),
 				thrust::divides<double>());
 
 	}
@@ -665,7 +665,7 @@ const double NewMC64::LOC_INFINITY = 1e37;
 void
 NewMC64::execute(bool scale)
 {
-	DoubleVector c_val;
+	DoubleVector c_val(m_nnz);
 	DoubleVector max_val_in_col(m_n, 0);
 
 	CPUTimer total_timer;
@@ -685,7 +685,7 @@ NewMC64::execute(bool scale)
 	BoolVector     matched(m_n, false);
 	BoolVector     rev_matched(m_n, false);
 
-	initPartialMatch(c_val, rowScale, colScale, rowReordering, rev_match_nodes, matched, rev_matched);
+	initPartialMatch(c_val, colScale, rowScale, rowReordering, rev_match_nodes, matched, rev_matched);
 	cpu_timer.Stop();
 	m_time_first = cpu_timer.getElapsed();
 
@@ -695,17 +695,17 @@ NewMC64::execute(bool scale)
 		IntVector    prev(m_n);
 		for (int i = 0; i < m_n; i++) {
 			if(rev_matched[i]) continue;
-			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, rowScale, colScale, c_val, irn);
+			findShortestAugPath(i, matched, rev_matched, rowReordering, rev_match_nodes,  prev, colScale, rowScale, c_val, irn);
 		}
 
 		if (thrust::any_of(matched.begin(), matched.end(), thrust::logical_not<bool>()))
 			throw system_error(system_error::Matrix_singular, "Singular matrix found");
 
-		thrust::transform(rowScale.begin(), rowScale.end(), rowScale.begin(), Exponential());
-		thrust::transform(thrust::make_transform_iterator(colScale.begin(), Exponential()),
-				thrust::make_transform_iterator(colScale.end(), Exponential()),
+		thrust::transform(colScale.begin(), colScale.end(), colScale.begin(), Exponential());
+		thrust::transform(thrust::make_transform_iterator(rowScale.begin(), Exponential()),
+				thrust::make_transform_iterator(rowScale.end(), Exponential()),
 				max_val_in_col.begin(),
-				colScale.begin(),
+				rowScale.begin(),
 				thrust::divides<double>());
 
 		cudaDeviceSynchronize();
@@ -716,55 +716,37 @@ NewMC64::execute(bool scale)
 	cpu_timer.Start();
 	thrust::scatter(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(m_n), rowReordering.begin(), m_rowPerm.begin());
 
-	cudaDeviceSynchronize();
 
 	IntVector&    rowPerm  = m_rowPerm;
 	IntVector     row_indices(m_nnz);
-	DoubleVector  values(m_nnz);
 
 	if (scale) {
-		for (int i = 0; i < m_n; i++) {
-			int start_idx = m_row_offsets[i], end_idx = m_row_offsets[i+1];
-			int new_row = rowPerm[i];
-			for (int l = start_idx; l < end_idx; l++) {
-				row_indices[l] = new_row;
-				int to   = (m_column_indices[l]);
-				double scaleFact = (rowScale[i] * colScale[to]);
-				values[l] = scaleFact * m_values[l];
-			}
-		}
-		thrust::copy(values.begin(), values.end(), m_values.begin());
+		const int *p_row_offsets  = thrust::raw_pointer_cast(&m_row_offsets[0]);
+		const int *p_row_perm     = thrust::raw_pointer_cast(&rowPerm[0]);
+		const double *p_row_scale = thrust::raw_pointer_cast(&rowScale[0]);
+		const double *p_col_scale = thrust::raw_pointer_cast(&colScale[0]);
+		int*  p_row_indices       = thrust::raw_pointer_cast(&row_indices[0]);
+		const int *p_column_indices = thrust::raw_pointer_cast(&m_column_indices[0]);
+		double* p_values          = thrust::raw_pointer_cast(&m_values[0]);
+		int gridX = m_n, gridY = 1;
+		kernelConfigAdjust(gridX, gridY, MAX_GRID_DIMENSION);
+		dim3 grids(gridX, gridY);
+		device::updateMatrix<<<grids, 64>>>(m_n, p_row_offsets, p_row_perm, p_row_scale, p_col_scale, p_row_indices, p_column_indices, p_values);
 	} else {
-		for (int i = 0; i < m_n; i++) {
-			int start_idx = m_row_offsets[i], end_idx = m_row_offsets[i+1];
-			int new_row = rowPerm[i];
-			for (int l = start_idx; l < end_idx; l++)
-				row_indices[l] = new_row;
-		}
+		const int *p_row_offsets  = thrust::raw_pointer_cast(&m_row_offsets[0]);
+		const int *p_row_perm     = thrust::raw_pointer_cast(&rowPerm[0]);
+		int*  p_row_indices       = thrust::raw_pointer_cast(&row_indices[0]);
+		int gridX = m_n, gridY = 1;
+		kernelConfigAdjust(gridX, gridY, MAX_GRID_DIMENSION);
+		dim3 grids(gridX, gridY);
+		device::updateMatrix<<<grids, 64>>>(m_n, p_row_offsets, p_row_perm, p_row_indices);
 	}
-	cudaDeviceSynchronize();
 
 	{
-		IntVector& row_offsets = m_row_offsets;
-		IntVector  column_indices(m_nnz);
-
-		thrust::fill(row_offsets.begin(), row_offsets.end(), 0);
-		cudaDeviceSynchronize();
-		for (int i = 0; i < m_nnz; i++)
-			row_offsets[row_indices[i]] ++;
-
-		thrust::inclusive_scan(row_offsets.begin(), row_offsets.end(), row_offsets.begin());
-		cudaDeviceSynchronize();
-
-		for (int i = m_nnz - 1; i >= 0; i--) {
-			int idx = (--row_offsets[row_indices[i]]);
-			column_indices[idx] = m_column_indices[i];
-			values[idx]         = m_values[i];
-		}
-
-		m_column_indices = column_indices;
-		m_values         = values;
+		thrust::stable_sort_by_key(row_indices.begin(), row_indices.end(), thrust::make_zip_iterator(thrust::make_tuple(m_column_indices.begin(), m_values.begin())));
+		indices_to_offsets(row_indices, m_row_offsets);
 	}
+	cudaDeviceSynchronize();
 	cpu_timer.Stop();
 	m_time_post = cpu_timer.getElapsed();
 
@@ -779,12 +761,10 @@ NewMC64::formBipartiteGraph(DoubleVector& c_val, DoubleVector& max_val_in_col)
 {
 	IntVector&    row_offsets  = m_row_offsets;
 
-	c_val  =  m_values;
-
 	{
 		IntVector    row_indices(m_nnz);
 		offsets_to_indices(row_offsets, row_indices);
-		thrust::transform(c_val.begin(), c_val.end(), c_val.begin(), AbsoluteValue<double>());
+		thrust::transform(m_values.begin(), m_values.end(), c_val.begin(), AbsoluteValue<double>());
 		thrust::reduce_by_key(row_indices.begin(), row_indices.end(), c_val.begin(), thrust::make_discard_iterator(), max_val_in_col.begin(), thrust::equal_to<double>(), thrust::maximum<double>());
 	}
 
@@ -817,6 +797,7 @@ NewMC64::initPartialMatch(DoubleVector& c_val,
 
 	thrust::fill(colScale.begin(), colScale.end(), LOC_INFINITY);
 	cudaDeviceSynchronize();
+
 
 	for(int i = 0; i < m_n; i++) {
 		int start_idx = m_row_offsets[i], end_idx = m_row_offsets[i+1];

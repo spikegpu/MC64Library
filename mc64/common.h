@@ -38,6 +38,7 @@ typedef long long int64_t;
 
 # include <memory.h>
 # include <thrust/device_ptr.h>
+# include <thrust/system/cuda/execution_policy.h>
 
 
 // ----------------------------------------------------------------------------
@@ -72,18 +73,21 @@ class ManagedVector {
 	size_t m_size;
 
 public:
+	typedef typename thrust::device_ptr<T> iterator;
+
 	ManagedVector(): m_p_array(0), m_size(0) {}
 	ManagedVector(size_t n): m_size(n) {
 		cudaMallocManaged(&m_p_array, sizeof(T) * n);
 	}
 	ManagedVector(size_t n, T val): m_size(n) {
 		cudaMallocManaged(&m_p_array, sizeof(T) * n);
-		for (int i = 0; i < n; i++)
-			m_p_array[i] = val;
+		thrust::fill(thrust::cuda::par, m_p_array, m_p_array + n, val);
+		cudaDeviceSynchronize();
 	}
 	ManagedVector(const ManagedVector &a): m_size(a.m_size) {
 		cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
-		memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+		thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
+		cudaDeviceSynchronize();
 	}
 	~ManagedVector() {cudaFree(m_p_array);}
 
@@ -92,10 +96,12 @@ public:
 			m_size = a.m_size;
 			cudaFree(m_p_array);
 			cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
-			memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+			thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
+			cudaDeviceSynchronize();
 		} else {
 			m_size = a.m_size;
-			memcpy(m_p_array, a.m_p_array, sizeof(T) * a.m_size);
+			thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
+			cudaDeviceSynchronize();
 		}
 
 		return *this;
@@ -115,8 +121,10 @@ public:
 			T *p_tmp;
 			cudaMallocManaged(&p_tmp, sizeof(T) * n);
 
-			if (m_size > 0)
-				memcpy(p_tmp, m_p_array, sizeof(T) * m_size);
+			if (m_size > 0) {
+				thrust::copy(thrust::cuda::par, m_p_array, m_p_array + m_size, p_tmp);
+				cudaDeviceSynchronize();
+			}
 
 			m_size = n;
 			cudaFree(m_p_array);

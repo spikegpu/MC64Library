@@ -6,7 +6,6 @@
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
-#include <thrust/system/omp/execution_policy.h>
 #include <thrust/system/cuda/execution_policy.h>
 
 #include <mc64/mc64.h>
@@ -94,8 +93,6 @@ int main(int argc, char **argv)
 
 	for (int i = 0; i < nnz; i++)
 		fin >> values_managed[i];
-
-	fin.close();
 
 	OutputItem outputItem(cout);
 
