@@ -26,24 +26,10 @@
 
 namespace mc64  {
 
-class OldMC64
+class MC64
 {
-private:
-	typedef typename thrust::host_vector<int>       IntVectorH;
-	typedef typename thrust::device_vector<int>     IntVectorD;
-	typedef typename thrust::host_vector<double>    DoubleVectorH;
-	typedef typename thrust::device_vector<double>  DoubleVectorD;
-	typedef typename thrust::host_vector<bool>      BoolVectorH;
-	typedef typename thrust::device_vector<bool>    BoolVectorD;
+protected:
 	typedef typename thrust::tuple<int, double>     Dijkstra;
-
-	IntVectorH     m_row_offsets;
-	IntVectorH     m_column_indices;
-	DoubleVectorH  m_values;
-
-	IntVectorD     m_rowPerm;
-	DoubleVectorD  m_rowScale;
-	DoubleVectorD  m_colScale;
 
 	double         m_time_pre;
 	double         m_time_first;
@@ -79,46 +65,15 @@ private:
 				offsets.begin());
 	}
 
-	void formBipartiteGraph(DoubleVectorD &d_c_val, DoubleVectorD &d_max_val_in_col);
-
-	void initPartialMatch(DoubleVectorH& c_val,
-						  DoubleVectorH& rowScale,
-						  DoubleVectorH& colScale,
-						  IntVectorH&    rowReordering,
-						  IntVectorH&    rev_match_nodes,
-						  BoolVectorH&   matched,
-						  BoolVectorH&   rev_matched);
-
-	void findShortestAugPath(int                   init_node,
-							 BoolVectorH&          matched,
-							 BoolVectorH&          rev_matched,
-							 IntVectorH&           match_nodes,
-							 IntVectorH&           rev_match_nodes,
-							 IntVectorH&           prev,
-							 DoubleVectorH&        u_val,
-							 DoubleVectorH&        v_val,
-							 DoubleVectorH&        c_val,
-							 IntVectorH&           irn);
-
 	static const double LOC_INFINITY;
+
 public:
-	OldMC64(const IntVectorH&    row_offsets,
-			const IntVectorH&    column_indices,
-			const DoubleVectorH& values)
-	:       m_row_offsets(row_offsets),
-	        m_column_indices(column_indices),
-	        m_values(values),
-		    m_done(false)
-		    {
-				int n = row_offsets.size() - 1;
-				m_rowPerm.resize(n);
-				m_n   = n;
-				m_nnz = m_values.size();
-			}
+	MC64(): m_done(false) {}
+	virtual ~MC64() {}
 
-	void execute(bool scale = true);
+	virtual void execute(bool scale = true) = 0;
 
-	void print(std::ostream &o);
+	virtual void print(std::ostream &o) = 0;
 
 	template <typename T>
 	struct AbsoluteValue
@@ -142,6 +97,7 @@ public:
 	struct CompareValue
 	{
 		inline
+		__host__ __device__
 		bool operator () (const thrust::tuple<int, VType> &a, const thrust::tuple<int, VType> &b) const {return thrust::get<1>(a) > thrust::get<1>(b);}
 	};
 
@@ -162,7 +118,67 @@ public:
 	double getTimePost() const {return m_time_post;}
 };
 
-const double OldMC64::LOC_INFINITY = 1e37;
+const double MC64::LOC_INFINITY = 1e37;
+
+class OldMC64: public MC64
+{
+private:
+	typedef typename thrust::host_vector<int>       IntVectorH;
+	typedef typename thrust::device_vector<int>     IntVectorD;
+	typedef typename thrust::host_vector<double>    DoubleVectorH;
+	typedef typename thrust::device_vector<double>  DoubleVectorD;
+	typedef typename thrust::host_vector<bool>      BoolVectorH;
+	typedef typename thrust::device_vector<bool>    BoolVectorD;
+
+	IntVectorH     m_row_offsets;
+	IntVectorH     m_column_indices;
+	DoubleVectorH  m_values;
+
+	IntVectorD     m_rowPerm;
+	DoubleVectorD  m_rowScale;
+	DoubleVectorD  m_colScale;
+
+	void formBipartiteGraph(DoubleVectorD &d_c_val, DoubleVectorD &d_max_val_in_col);
+
+	void initPartialMatch(DoubleVectorH& c_val,
+						  DoubleVectorH& rowScale,
+						  DoubleVectorH& colScale,
+						  IntVectorH&    rowReordering,
+						  IntVectorH&    rev_match_nodes,
+						  BoolVectorH&   matched,
+						  BoolVectorH&   rev_matched);
+
+	void findShortestAugPath(int             init_node,
+							 BoolVectorH&    matched,
+							 BoolVectorH&    rev_matched,
+							 IntVectorH&     match_nodes,
+							 IntVectorH&     rev_match_nodes,
+							 IntVectorH&     prev,
+							 DoubleVectorH&  u_val,
+							 DoubleVectorH&  v_val,
+							 DoubleVectorH&  c_val,
+							 IntVectorH&     irn);
+
+
+public:
+	OldMC64(const IntVectorH&    row_offsets,
+			const IntVectorH&    column_indices,
+			const DoubleVectorH& values)
+	:       m_row_offsets(row_offsets),
+	        m_column_indices(column_indices),
+	        m_values(values)
+		    {
+				int n = row_offsets.size() - 1;
+				m_rowPerm.resize(n);
+				m_n   = n;
+				m_nnz = m_values.size();
+			}
+
+	virtual ~OldMC64() {}
+
+	void execute(bool scale = true);
+	void print(std::ostream &o);
+};
 
 void
 OldMC64::execute(bool scale)
@@ -345,16 +361,16 @@ OldMC64::initPartialMatch(DoubleVectorH& c_val,
 }
 
 void
-OldMC64::findShortestAugPath(int                   init_node,
-							 BoolVectorH&          matched,
-                    		 BoolVectorH&          rev_matched,
-                    		 IntVectorH&           match_nodes,
-                    		 IntVectorH&           rev_match_nodes,
-                    		 IntVectorH&           prev,
-                    		 DoubleVectorH&        u_val,
-                    		 DoubleVectorH&        v_val,
-                    		 DoubleVectorH&        c_val,
-                    		 IntVectorH&           irn)
+OldMC64::findShortestAugPath(int             init_node,
+							 BoolVectorH&    matched,
+							 BoolVectorH&    rev_matched,
+							 IntVectorH&     match_nodes,
+							 IntVectorH&     rev_match_nodes,
+							 IntVectorH&     prev,
+							 DoubleVectorH&  u_val,
+							 DoubleVectorH&  v_val,
+							 DoubleVectorH&  c_val,
+							 IntVectorH&     irn)
 {
 	static IntVectorH B(m_n, 0);
 	int b_cnt = 0;
@@ -373,7 +389,7 @@ OldMC64::findShortestAugPath(int                   init_node,
 	prev[init_node] = -1;
 
 	static DoubleVectorH d_vals(m_n, LOC_INFINITY);
-	static BoolVectorH   visited(m_n, false);
+	static BoolVectorH visited(m_n, false);
 
 	while(1) {
 		int start_cur = m_row_offsets[cur_node];
@@ -524,13 +540,12 @@ OldMC64::print(std::ostream& o)
 		o << std::endl;
 }
 
-class NewMC64
+class NewMC64: public MC64
 {
 private:
 	typedef ManagedVector<int>                      IntVector;
 	typedef ManagedVector<double>                   DoubleVector;
 	typedef ManagedVector<bool>                     BoolVector;
-	typedef typename thrust::tuple<int, double>     Dijkstra;
 
 	IntVector      m_row_offsets;
 	IntVector      m_column_indices;
@@ -540,42 +555,7 @@ private:
 	DoubleVector   m_rowScale;
 	DoubleVector   m_colScale;
 
-	size_t         m_n;
-	size_t         m_nnz;
-
-	bool           m_done;
-
-	double         m_time_pre;
-	double         m_time_first;
-	double         m_time_second;
-	double         m_time_post;
-	double         m_time_total;
-
-	template <typename IVector>
-	static void offsets_to_indices(const IVector& offsets, IVector& indices)
-	{
-		// convert compressed row offsets into uncompressed row indices
-		thrust::fill(indices.begin(), indices.end(), 0);
-		thrust::scatter( thrust::counting_iterator<int>(0),
-				thrust::counting_iterator<int>(offsets.size()-1),
-				offsets.begin(),
-				indices.begin());
-		//// thrust::inclusive_scan(thrust::cuda::par, indices.begin(), indices.end(), indices.begin(), thrust::maximum<int>());
-		thrust::inclusive_scan(indices.begin(), indices.end(), indices.begin(), thrust::maximum<int>());
-	}
-
-	template <typename IVector>
-	static void indices_to_offsets(const IVector& indices, IVector& offsets)
-	{
-		// convert uncompressed row indices into compressed row offsets
-		thrust::lower_bound(indices.begin(),
-				indices.end(),
-				thrust::counting_iterator<int>(0),
-				thrust::counting_iterator<int>(offsets.size()),
-				offsets.begin());
-	}
-
-	void formBipartiteGraph(DoubleVector &d_c_val, DoubleVector &d_max_val_in_col);
+	void formBipartiteGraph(DoubleVector &c_val, DoubleVector &max_val_in_col);
 
 	void initPartialMatch(DoubleVector& c_val,
 						  DoubleVector& rowScale,
@@ -585,26 +565,24 @@ private:
 						  BoolVector&   matched,
 						  BoolVector&   rev_matched);
 
-	void findShortestAugPath(int                  init_node,
-							 BoolVector&          matched,
-							 BoolVector&          rev_matched,
-							 IntVector&           match_nodes,
-							 IntVector&           rev_match_nodes,
-							 IntVector&           prev,
-							 DoubleVector&        u_val,
-							 DoubleVector&        v_val,
-							 DoubleVector&        c_val,
-							 IntVector&           irn);
+	void findShortestAugPath(int            init_node,
+							 BoolVector&    matched,
+							 BoolVector&    rev_matched,
+							 IntVector&     match_nodes,
+							 IntVector&     rev_match_nodes,
+							 IntVector&     prev,
+							 DoubleVector&  u_val,
+							 DoubleVector&  v_val,
+							 DoubleVector&  c_val,
+							 IntVector&     irn);
 
-	static const double LOC_INFINITY;
 public:
 	NewMC64(const IntVector&    row_offsets,
 			const IntVector&    column_indices,
 			const DoubleVector& values)
 	:       m_row_offsets(row_offsets),
 	        m_column_indices(column_indices),
-	        m_values(values),
-		    m_done(false)
+	        m_values(values)
 		    {
 				size_t n = row_offsets.size() - 1;
 				m_rowPerm.resize(n);
@@ -614,53 +592,11 @@ public:
 				m_nnz = m_values.size();
 			}
 
+	virtual ~NewMC64() {}
+
 	void execute(bool scale = true);
-
 	void print(std::ostream &o);
-
-	template <typename T>
-	struct AbsoluteValue
-	{
-		inline
-		__host__ __device__
-		T operator() (T a) {return (a < 0 ? (-a) : a);}
-	};
-
-	struct ClearValue: public thrust::unary_function<double, double>
-	{
-		inline
-		__host__ __device__
-		double operator() (double a)
-		{
-			return 0.0;
-		}
-	};
-
-	template <typename VType>
-	struct CompareValue
-	{
-		inline
-		bool operator () (const thrust::tuple<int, VType> &a, const thrust::tuple<int, VType> &b) const {return thrust::get<1>(a) > thrust::get<1>(b);}
-	};
-
-	struct Exponential: public thrust::unary_function<double, double>
-	{
-		inline
-		__host__ __device__
-		double operator() (double a)
-		{
-			return exp(a);
-		}
-	};
-
-	double getTimeTotal() const {return m_time_total;}
-	double getTimePre() const {return m_time_pre;}
-	double getTimeFirst() const {return m_time_first;}
-	double getTimeSecond() const {return m_time_second;}
-	double getTimePost() const {return m_time_post;}
 };
-
-const double NewMC64::LOC_INFINITY = 1e37;
 
 void
 NewMC64::execute(bool scale)
@@ -757,7 +693,7 @@ NewMC64::execute(bool scale)
 }
 
 void
-NewMC64::formBipartiteGraph(DoubleVector& c_val, DoubleVector& max_val_in_col)
+NewMC64::formBipartiteGraph(DoubleVector &c_val, DoubleVector &max_val_in_col)
 {
 	IntVector&    row_offsets  = m_row_offsets;
 
@@ -828,16 +764,16 @@ NewMC64::initPartialMatch(DoubleVector& c_val,
 }
 
 void
-NewMC64::findShortestAugPath(int                  init_node,
-							 BoolVector&          matched,
-                    		 BoolVector&          rev_matched,
-                    		 IntVector&           match_nodes,
-                    		 IntVector&           rev_match_nodes,
-                    		 IntVector&           prev,
-                    		 DoubleVector&        u_val,
-                    		 DoubleVector&        v_val,
-                    		 DoubleVector&        c_val,
-                    		 IntVector&           irn)
+NewMC64::findShortestAugPath(int            init_node,
+							 BoolVector&    matched,
+							 BoolVector&    rev_matched,
+							 IntVector&     match_nodes,
+							 IntVector&     rev_match_nodes,
+							 IntVector&     prev,
+							 DoubleVector&  u_val,
+							 DoubleVector&  v_val,
+							 DoubleVector&  c_val,
+							 IntVector&     irn)
 {
 	static IntVector B(m_n, 0);
 	int b_cnt = 0;
@@ -856,7 +792,7 @@ NewMC64::findShortestAugPath(int                  init_node,
 	prev[init_node] = -1;
 
 	static DoubleVector d_vals(m_n, LOC_INFINITY);
-	static BoolVector   visited(m_n, false);
+	static BoolVector visited(m_n, false);
 
 	while(1) {
 		int start_cur = m_row_offsets[cur_node];
