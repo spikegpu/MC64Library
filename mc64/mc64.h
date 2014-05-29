@@ -546,6 +546,9 @@ private:
 	typedef ManagedVector<int>                      IntVector;
 	typedef ManagedVector<double>                   DoubleVector;
 	typedef ManagedVector<bool>                     BoolVector;
+	typedef thrust::host_vector<int>                IntVectorH;
+	typedef thrust::host_vector<bool>               BoolVectorH;
+	typedef thrust::host_vector<double>             DoubleVectorH;
 
 	IntVector      m_row_offsets;
 	IntVector      m_column_indices;
@@ -775,9 +778,9 @@ NewMC64::findShortestAugPath(int            init_node,
 							 DoubleVector&  c_val,
 							 IntVector&     irn)
 {
-	static IntVector B(m_n, 0);
+	static IntVectorH B(m_n, 0);
 	int b_cnt = 0;
-	static BoolVector inB(m_n, false);
+	static BoolVectorH inB(m_n, false);
 
 	std::priority_queue<Dijkstra, std::vector<Dijkstra>, CompareValue<double> > Q;
 
@@ -791,8 +794,8 @@ NewMC64::findShortestAugPath(int            init_node,
 	int ksap = -1;
 	prev[init_node] = -1;
 
-	static DoubleVector d_vals(m_n, LOC_INFINITY);
-	static BoolVector visited(m_n, false);
+	static DoubleVectorH d_vals(m_n, LOC_INFINITY);
+	static BoolVectorH visited(m_n, false);
 
 	while(1) {
 		int start_cur = m_row_offsets[cur_node];
