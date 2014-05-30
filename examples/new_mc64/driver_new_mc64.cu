@@ -94,6 +94,8 @@ int main(int argc, char **argv)
 	for (int i = 0; i < nnz; i++)
 		fin >> values_managed[i];
 
+	fin.close();
+
 	OutputItem outputItem(cout);
 
 	cout << "<tr valign=top>" << endl;
