@@ -47,15 +47,14 @@ void old_scatter() {
 		h_input[i] = 10.0 + (i + 1);
 
 	cudaMemcpy(d_input, h_input, sizeof(double) * 10, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_output, h_output, sizeof(double) * 10, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_map,   h_map,   sizeof(int) * 10,    cudaMemcpyHostToDevice);
 
-	thrust::scatter(thrust::cuda::par, d_input, d_input + 10, d_map, d_output);
+	//// thrust::scatter(thrust::cuda::par, d_input, d_input + 10, d_map, d_output);
 	{
-		/*
 		thrust::device_ptr<double> input_begin(d_input), input_end(d_input + 10), output_begin(d_output);
 		thrust::device_ptr<int>    map_begin(d_map);
 		thrust::scatter(thrust::cuda::par, input_begin, input_end, map_begin, output_begin);
-		*/
 	}
 
 	cudaMemcpy(h_output, d_output, sizeof(double) * 10, cudaMemcpyDeviceToHost);
@@ -115,6 +114,7 @@ void old_scatter_if() {
 	}
 
 	cudaMemcpy(d_input, h_input, sizeof(double) * 10, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_output, h_output, sizeof(double) * 10, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_stencil, h_stencil, sizeof(bool) * 10, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_map,   h_map,   sizeof(int) * 10,    cudaMemcpyHostToDevice);
 
