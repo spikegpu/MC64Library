@@ -1,0 +1,1 @@
+/usr/bin/c++   -O3 -DNDEBUG    CMakeFiles/driver_scatter_and_gather.dir/./driver_scatter_and_gather_generated_driver_scatter_and_gather.cu.o  -o driver_scatter_and_gather -rdynamic -lcudart -lcuda 
