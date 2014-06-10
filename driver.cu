@@ -58,7 +58,7 @@ int main(int argc, char **argv)
   */
 
   // Run the MC64 algorithm
-  mc64::OldMC64 algo(row_offsets, column_indices, values);
+  mc64::MC64 algo(row_offsets, column_indices, values);
 
   std::cout << "Run MC64... ";
   try {
