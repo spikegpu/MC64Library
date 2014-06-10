@@ -1,14 +1,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-
-
 #define ALWAYS_ASSERT
 
 #ifdef WIN32
 typedef long long int64_t;
 #endif
-
 
 
 // ----------------------------------------------------------------------------
@@ -36,9 +33,12 @@ typedef long long int64_t;
 #  include <assert.h>
 #endif
 
-# include <memory.h>
-# include <thrust/device_ptr.h>
-# include <thrust/system/cuda/execution_policy.h>
+
+#include <memory.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 
 // ----------------------------------------------------------------------------
@@ -52,88 +52,86 @@ const unsigned int MAX_GRID_DIMENSION = 32768;
 
 inline
 void kernelConfigAdjust(int &numThreads, int &numBlockX, const int numThreadsMax) {
-	if (numThreads > numThreadsMax) {
-		numBlockX = (numThreads + numThreadsMax - 1) / numThreadsMax;
-		numThreads = numThreadsMax;
-	}
+  if (numThreads > numThreadsMax) {
+    numBlockX = (numThreads + numThreadsMax - 1) / numThreadsMax;
+    numThreads = numThreadsMax;
+  }
 }
 
 inline
 void kernelConfigAdjust(int &numThreads, int &numBlockX, int &numBlockY, const int numThreadsMax, const int numBlockXMax) {
-	kernelConfigAdjust(numThreads, numBlockX, numThreadsMax);
-	if (numBlockX > numBlockXMax) {
-		numBlockY = (numBlockX + numBlockXMax - 1) / numBlockXMax;
-		numBlockX = numBlockXMax;
-	}
+  kernelConfigAdjust(numThreads, numBlockX, numThreadsMax);
+  if (numBlockX > numBlockXMax) {
+    numBlockY = (numBlockX + numBlockXMax - 1) / numBlockXMax;
+    numBlockX = numBlockXMax;
+  }
 }
 
-template <typename T>
-class ManagedVector {
-	T*     m_p_array;
-	size_t m_size;
+// -----------------------------------------------------------------------------
+// Convert matrix from COO to CSR format
+// -----------------------------------------------------------------------------
+template <typename Ivec, typename Rvec>
+void coo2csr(const int    n_row,
+             const int    n_col,
+             const int    nnz,
+             const int    Ai[],
+             const int    Aj[],
+             const double Ax[],
+             Ivec&        Bp,
+             Ivec&        Bj,
+             Rvec&        Bx)
+{
+  //compute number of non-zero entries per row of A 
+  for (int i = 0; i <= n_row; i++)
+    Bp[i] = 0;
 
-public:
-	typedef typename thrust::device_ptr<T> iterator;
+  for (int i = 0; i < nnz; i++)
+    Bp[Ai[i]]++;
 
-	ManagedVector(): m_p_array(0), m_size(0) {}
-	ManagedVector(size_t n): m_size(n) {
-		cudaMallocManaged(&m_p_array, sizeof(T) * n);
-	}
-	ManagedVector(size_t n, T val): m_size(n) {
-		cudaMallocManaged(&m_p_array, sizeof(T) * n);
-		thrust::fill(thrust::cuda::par, m_p_array, m_p_array + n, val);
-		cudaDeviceSynchronize();
-	}
-	ManagedVector(const ManagedVector &a): m_size(a.m_size) {
-		cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
-		thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
-		cudaDeviceSynchronize();
-	}
-	~ManagedVector() {cudaFree(m_p_array);}
+  //cumsum the nnz per row to get Bp[]
+  for(int i = 0, cumsum = 0; i < n_row; i++) {
+    int temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
+  }
+  Bp[n_row] = nnz; 
 
-	ManagedVector& operator=(const ManagedVector &a) {
-		if (m_size < a.m_size) {
-			m_size = a.m_size;
-			cudaFree(m_p_array);
-			cudaMallocManaged(&m_p_array, sizeof(T) * a.m_size);
-			thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
-			cudaDeviceSynchronize();
-		} else {
-			m_size = a.m_size;
-			thrust::copy(thrust::cuda::par, a.m_p_array, a.m_p_array + a.m_size, m_p_array);
-			cudaDeviceSynchronize();
-		}
+  //write Aj,Ax into Bj,Bx
+  for(int i = 0; i < nnz; i++) {
+    int row  = Ai[i];
+    int dest = Bp[row];
 
-		return *this;
-	}
+    Bj[dest] = Aj[i];
+    Bx[dest] = Ax[i];
 
-	thrust::device_ptr<T> begin() const {return thrust::device_pointer_cast(&m_p_array[0]);}
-	thrust::device_ptr<T> end()   const {return thrust::device_pointer_cast(&m_p_array[m_size]);}
+    Bp[row]++;
+  }
 
-	T& operator[](size_t n)    {return m_p_array[n];}
-	const T& operator[](size_t n)  const  {return m_p_array[n];}
+  for(int i = 0, last = 0; i <= n_row; i++) {
+    int temp = Bp[i];
+    Bp[i]  = last;
+    last   = temp;
+  }
+}
 
-	size_t size() const {return m_size;}
+// -----------------------------------------------------------------------------
+// Extract matrix name from specified filename
+// -----------------------------------------------------------------------------
+void getName(const std::string& filename,
+             std::string&       matname)
+{
+  matname = filename;
 
-	void resize(size_t n)  {
-		if (m_size >= n) m_size = n;
-		else {
-			T *p_tmp;
-			cudaMallocManaged(&p_tmp, sizeof(T) * n);
+  // Remove directory if present.
+  const size_t last_slash_idx = matname.find_last_of("\\/");
+  if (std::string::npos != last_slash_idx)
+    matname.erase(0, last_slash_idx + 1);
 
-			if (m_size > 0) {
-				thrust::copy(thrust::cuda::par, m_p_array, m_p_array + m_size, p_tmp);
-				cudaDeviceSynchronize();
-			}
-
-			m_size = n;
-			cudaFree(m_p_array);
-
-			m_p_array = p_tmp;
-		}
-	}
-
-};
+  // Remove extension if present.
+  const size_t period_idx = matname.rfind('.');
+  if (std::string::npos != period_idx)
+    matname.erase(period_idx);
+}
 
 
 } // namespace spike
