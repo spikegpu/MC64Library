@@ -70,15 +70,16 @@ void kernelConfigAdjust(int &numThreads, int &numBlockX, int &numBlockY, const i
 // -----------------------------------------------------------------------------
 // Convert matrix from COO to CSR format
 // -----------------------------------------------------------------------------
-void coo2csr(const int                    n_row,
-             const int                    n_col,
-             const int                    nnz,
-             const int                    Ai[],
-             const int                    Aj[],
-             const double                 Ax[],
-             thrust::host_vector<int>&    Bp,
-             thrust::host_vector<int>&    Bj,
-             thrust::host_vector<double>& Bx)
+template <typename Ivec, typename Rvec>
+void coo2csr(const int    n_row,
+             const int    n_col,
+             const int    nnz,
+             const int    Ai[],
+             const int    Aj[],
+             const double Ax[],
+             Ivec&        Bp,
+             Ivec&        Bj,
+             Rvec&        Bx)
 {
   //compute number of non-zero entries per row of A 
   thrust::fill(Bp.begin(), Bp.end(), 0);
