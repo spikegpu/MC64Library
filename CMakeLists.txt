@@ -34,6 +34,7 @@ INCLUDE_DIRECTORIES(
     )
 
 cuda_add_executable(driver driver.cu ${MC64_HEADERS} ${MC64_CUHEADERS} ${MMIO_FILES})
+cuda_add_executable(testing testing.cu ${MC64_HEADERS} ${MC64_CUHEADERS} ${MMIO_FILES})
 
 IF(NOT (${CUDA_VERSION} VERSION_LESS "6.0"))
   cuda_add_executable(driver_um driver_um.cu ${MC64_HEADERS} ${MC64_CUHEADERS} ${MMIO_FILES})

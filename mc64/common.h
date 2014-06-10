@@ -114,6 +114,24 @@ void coo2csr(const int    n_row,
   }
 }
 
+// -----------------------------------------------------------------------------
+// Extract matrix name from specified filename
+// -----------------------------------------------------------------------------
+void getName(const std::string& filename,
+             std::string&       matname)
+{
+  matname = filename;
+
+  // Remove directory if present.
+  const size_t last_slash_idx = matname.find_last_of("\\/");
+  if (std::string::npos != last_slash_idx)
+    matname.erase(0, last_slash_idx + 1);
+
+  // Remove extension if present.
+  const size_t period_idx = matname.rfind('.');
+  if (std::string::npos != period_idx)
+    matname.erase(period_idx);
+}
 
 
 } // namespace spike
