@@ -33,9 +33,12 @@ typedef long long int64_t;
 #  include <assert.h>
 #endif
 
-# include <memory.h>
-# include <thrust/device_ptr.h>
-# include <thrust/system/cuda/execution_policy.h>
+
+#include <memory.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 
 // ----------------------------------------------------------------------------
@@ -63,6 +66,53 @@ void kernelConfigAdjust(int &numThreads, int &numBlockX, int &numBlockY, const i
     numBlockX = numBlockXMax;
   }
 }
+
+// -----------------------------------------------------------------------------
+// Convert matrix from COO to CSR format
+// -----------------------------------------------------------------------------
+void coo2csr(const int                    n_row,
+             const int                    n_col,
+             const int                    nnz,
+             const int                    Ai[],
+             const int                    Aj[],
+             const double                 Ax[],
+             thrust::host_vector<int>&    Bp,
+             thrust::host_vector<int>&    Bj,
+             thrust::host_vector<double>& Bx)
+{
+  //compute number of non-zero entries per row of A 
+  thrust::fill(Bp.begin(), Bp.end(), 0);
+
+  for (int i = 0; i < nnz; i++){
+    Bp[Ai[i]]++;
+  }
+
+  //cumsum the nnz per row to get Bp[]
+  for(int i = 0, cumsum = 0; i < n_row; i++){
+    int temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
+  }
+  Bp[n_row] = nnz; 
+
+  //write Aj,Ax into Bj,Bx
+  for(int i = 0; i < nnz; i++){
+    int row  = Ai[i];
+    int dest = Bp[row];
+
+    Bj[dest] = Aj[i];
+    Bx[dest] = Ax[i];
+
+    Bp[row]++;
+  }
+
+  for(int i = 0, last = 0; i <= n_row; i++){
+    int temp = Bp[i];
+    Bp[i]  = last;
+    last   = temp;
+  }
+}
+
 
 
 } // namespace spike

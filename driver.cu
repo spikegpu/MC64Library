@@ -3,127 +3,84 @@
 #include <cmath>
 #include <string>
 
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-
+extern "C" {
+#include "mm_io/mm_io.h"
+}
 #include "mc64/mc64.h"
-
-using std::cout;
-using std::cin;
-using std::endl;
-using std::string;
-using std::vector;
 
 typedef typename thrust::host_vector<int>     IntVectorH;
 typedef typename thrust::host_vector<double>  DoubleVectorH;
 
-// Color to print
-enum TestColor {COLOR_NO = 0,
-                COLOR_RED,
-                COLOR_GREEN} ;
-
-class OutputItem
-{
-public:
-	OutputItem(std::ostream &o): m_o(o), m_additional_item_count(19) {}
-
-	int           m_additional_item_count;
-
-	template <typename T>
-	void operator() (T item, TestColor c = COLOR_NO) {
-		m_o << "<td style=\"border-style: inset;\">\n";
-		switch (c)
-		{
-			case COLOR_RED:
-				m_o << "<p> <FONT COLOR=\"Red\">" << item << " </FONT> </p>\n";
-				break;
-
-			case COLOR_GREEN:
-				m_o << "<p> <FONT COLOR=\"Green\">" << item << " </FONT> </p>\n";
-				break;
-
-			default:
-				m_o << "<p> " << item << " </p>\n";
-				break;
-		}
-		m_o << "</td>\n";
-	}
-private:
-	std::ostream &m_o;
-};
-
 int main(int argc, char **argv)
 {
-	size_t        N, nnz;
+  if (argc < 3) {
+    std::cout << "Usage:\n  driver input_file output_file" << std::endl;
+    return 1;
+  }
 
-	IntVectorH    row_offsets;
-	IntVectorH    column_indices;
-	DoubleVectorH values;
+  // Read matrix from file (COO format)
+  MM_typecode matcode;
+  int M, N, nnz;
+  int* row_i;
+  int* col_j;
+  double* vals;
 
-	std::ifstream  fin;
+  std::cout << "Read MTX file... ";
+  int err = mm_read_mtx_crd(argv[1], &M, &N, &nnz, &row_i, &col_j, &vals, &matcode);
+  if (err != 0) {
+    std::cout << "error: " << err << std::endl;
+    return 1;
+  }
+  std::cout << "M = " << M << " N = " << N << " nnz = " << nnz << std::endl;
 
-	std::string fileMat;
+  // Switch to 0-based indices
+  for (int i = 0; i < nnz; i++) {
+    row_i[i]--;
+    col_j[i]--;
+  }
 
-	if (argc < 2)
-		return 1;
-	else {
-		fin.open(argv[1], std::ifstream::in);
-		if (!fin.is_open())
-			return 1;
-	}
+  // Convert to CSR format and load into thrust vectors.
+  IntVectorH    row_offsets(N + 1);
+  IntVectorH    column_indices(nnz);
+  DoubleVectorH values(nnz);
 
-	fin >> fileMat >> N >> nnz;
+  std::cout << "Convert to CSR" << std::endl;
+  mc64::coo2csr(M, N, nnz, row_i, col_j, vals, row_offsets, column_indices, values);
 
-	row_offsets.resize(N + 1);
-	column_indices.resize(nnz);
-	values.resize(nnz);
+  // Print thrust vectors
+  /*
+  std::cout << "Row offsets\n";
+  thrust::copy(row_offsets.begin(), row_offsets.end(), std::ostream_iterator<int>(std::cout, "\n"));
+  std::cout << "Column indices\n";
+  thrust::copy(column_indices.begin(), column_indices.end(), std::ostream_iterator<int>(std::cout, "\n"));
+  std::cout << "Values\n";
+  thrust::copy(values.begin(), values.end(), std::ostream_iterator<double>(std::cout, "\n"));
+  */
 
-	for (int i = 0; i <= N; i++)
-		fin >> row_offsets[i];
+  // Run the MC64 algorithm
+  mc64::OldMC64 algo(row_offsets, column_indices, values);
 
-	for (int i = 0; i < nnz; i++)
-		fin >> column_indices[i];
+  std::cout << "Run MC64... ";
+  try {
+    algo.execute();
+  } catch (const mc64::system_error& se) {
+    std::cout << "error " << se.reason() << std::endl;
+    return 1;
+  }
+  std::cout << "success" << std::endl;
 
-	for (int i = 0; i < nnz; i++)
-		fin >> values[i];
+  // Generate output with results.
+  std::cout << "Time pre:    " << algo.getTimePre()    << std::endl;
+  std::cout << "Time first:  " << algo.getTimeFirst()  << std::endl;
+  std::cout << "Time second: " << algo.getTimeSecond() << std::endl;
+  std::cout << "Time pos:    " << algo.getTimePost()   << std::endl;
+  std::cout << "Time total:  " << algo.getTimeTotal()  << std::endl;
 
-	fin.close();
+  std::cout << "Write output file " << argv[2] << std::endl;
+  std::ofstream fout;
+  fout.open(argv[2]);
+  algo.print(fout);
+  fout.close();
 
-	mc64::OldMC64 oldMC64(row_offsets, column_indices, values);
-
-	OutputItem outputItem(cout);
-
-	cout << "<tr valign=top>" << endl;
-
-	outputItem(fileMat);
-
-	outputItem(N);
-
-	outputItem(nnz);
-
-	try {
-		oldMC64.execute();
-	} catch (const mc64::system_error& se) {
-		outputItem("");
-		outputItem("");
-		outputItem("");
-		outputItem("");
-		outputItem("");
-
-		return 1;
-	}
-
-	outputItem(oldMC64.getTimePre());
-
-	outputItem(oldMC64.getTimeFirst());
-
-	outputItem(oldMC64.getTimeSecond());
-
-	outputItem(oldMC64.getTimePost());
-
-	outputItem(oldMC64.getTimeTotal());
-
-	cout << "</tr>" << endl;
-
-	return 0;
+  return 0;
 }
