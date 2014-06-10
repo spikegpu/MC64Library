@@ -2,11 +2,11 @@
 #include <fstream>
 #include <cmath>
 #include <string>
+
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
-#include <mc64/mc64.h>
-#include <mc64/timer.h>
+#include "mc64/mc64.h"
 
 using std::cout;
 using std::cin;
@@ -16,9 +16,6 @@ using std::vector;
 
 typedef typename thrust::host_vector<int>     IntVectorH;
 typedef typename thrust::host_vector<double>  DoubleVectorH;
-
-typedef typename mc64::ManagedVector<int>     IntVector;
-typedef typename mc64::ManagedVector<double>  DoubleVector;
 
 // Color to print
 enum TestColor {COLOR_NO = 0,

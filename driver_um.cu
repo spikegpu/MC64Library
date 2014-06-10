@@ -2,14 +2,14 @@
 #include <fstream>
 #include <cmath>
 #include <string>
+
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/system/cuda/execution_policy.h>
 
-#include <mc64/mc64.h>
-#include <mc64/timer.h>
+#include "mc64/mc64_um.h"
 
 using std::cout;
 using std::cerr;

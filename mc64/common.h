@@ -1,14 +1,13 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-
+#include "mc64/config.h"
 
 #define ALWAYS_ASSERT
 
 #ifdef WIN32
 typedef long long int64_t;
 #endif
-
 
 
 // ----------------------------------------------------------------------------
@@ -67,6 +66,7 @@ void kernelConfigAdjust(int &numThreads, int &numBlockX, int &numBlockY, const i
 	}
 }
 
+#ifdef MC64_HAS_CUDA6
 template <typename T>
 class ManagedVector {
 	T*     m_p_array;
@@ -134,6 +134,7 @@ public:
 	}
 
 };
+#endif
 
 
 } // namespace spike
