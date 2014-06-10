@@ -9,14 +9,18 @@ MESSAGE(STATUS "Cuda version: ${CUDA_VERSION}")
 
 SET(MC64_HEADERS
   mc64/mc64.h
+  mc64/mc64_um.h
   mc64/common.h
   mc64/timer.h
   mc64/exception.h
   )
 
 SET(MC64_CUHEADERS
-  mc64/device/mc64.cuh
+  mc64/device/kernels.cuh
   )
+
+SOURCE_GROUP("Headers" FILES ${MC64_HEADERS})
+SOURCE_GROUP("CUDA Headers" FILES ${MC64_CUHEADERS})
 
 INCLUDE_DIRECTORIES(
     ${CMAKE_SOURCE_DIR}
