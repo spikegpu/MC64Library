@@ -2,6 +2,7 @@
 #define MC64_UM_H
 
 #include "mc64/mc64.h"
+#include "mc64/managed.h"
 
 namespace mc64  {
 
