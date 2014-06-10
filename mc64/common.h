@@ -82,14 +82,14 @@ void coo2csr(const int    n_row,
              Rvec&        Bx)
 {
   //compute number of non-zero entries per row of A 
-  thrust::fill(Bp.begin(), Bp.end(), 0);
+  for (int i = 0; i <= n_row; i++)
+    Bp[i] = 0;
 
-  for (int i = 0; i < nnz; i++){
+  for (int i = 0; i < nnz; i++)
     Bp[Ai[i]]++;
-  }
 
   //cumsum the nnz per row to get Bp[]
-  for(int i = 0, cumsum = 0; i < n_row; i++){
+  for(int i = 0, cumsum = 0; i < n_row; i++) {
     int temp = Bp[i];
     Bp[i] = cumsum;
     cumsum += temp;
@@ -97,7 +97,7 @@ void coo2csr(const int    n_row,
   Bp[n_row] = nnz; 
 
   //write Aj,Ax into Bj,Bx
-  for(int i = 0; i < nnz; i++){
+  for(int i = 0; i < nnz; i++) {
     int row  = Ai[i];
     int dest = Bp[row];
 
@@ -107,7 +107,7 @@ void coo2csr(const int    n_row,
     Bp[row]++;
   }
 
-  for(int i = 0, last = 0; i <= n_row; i++){
+  for(int i = 0, last = 0; i <= n_row; i++) {
     int temp = Bp[i];
     Bp[i]  = last;
     last   = temp;
