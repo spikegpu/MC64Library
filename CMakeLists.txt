@@ -11,6 +11,7 @@ SET(MC64_HEADERS
   mc64/mc64.h
   mc64/mc64_um.h
   mc64/common.h
+  mc64/managed.h
   mc64/timer.h
   mc64/exception.h
   )
@@ -30,11 +31,5 @@ INCLUDE_DIRECTORIES(
 cuda_add_executable(driver driver.cu ${MC64_HEADERS} ${MC64_CUHEADERS})
 
 IF(NOT (${CUDA_VERSION} VERSION_LESS "6.0"))
-  SET(MC64_HAS_CUDA6 "#define MC64_HAS_CUDA6")
   cuda_add_executable(driver_um driver_um.cu ${MC64_HEADERS} ${MC64_CUHEADERS})
 ENDIF()
-
-CONFIGURE_FILE(
-  ${PROJECT_SOURCE_DIR}/cmake/config.in
-  ${PROJECT_BINARY_DIR}/mc64/config.h
-  )

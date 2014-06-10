@@ -19,7 +19,6 @@
 #include <thrust/binary_search.h>
 #include <thrust/system/cuda/execution_policy.h>
 
-#include "mc64/config.h"
 #include "mc64/common.h"
 #include "mc64/timer.h"
 #include "mc64/exception.h"
