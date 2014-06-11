@@ -12,12 +12,9 @@ namespace mc64  {
 class MC64_UM: public MC64_base
 {
 private:
-  typedef ManagedVector<int>                      IntVector;
-  typedef ManagedVector<double>                   DoubleVector;
-  typedef ManagedVector<bool>                     BoolVector;
-  typedef thrust::host_vector<int>                IntVectorH;
-  typedef thrust::host_vector<bool>               BoolVectorH;
-  typedef thrust::host_vector<double>             DoubleVectorH;
+  typedef ManagedVector<int>     IntVector;
+  typedef ManagedVector<double>  DoubleVector;
+  typedef ManagedVector<bool>    BoolVector;
 
   IntVector      m_row_offsets;
   IntVector      m_column_indices;
@@ -27,15 +24,16 @@ private:
   DoubleVector   m_rowScale;
   DoubleVector   m_colScale;
 
-  void formBipartiteGraph(DoubleVector &c_val, DoubleVector &max_val_in_col);
+  void formBipartiteGraph(DoubleVector&  c_val,
+                          DoubleVector&  max_val_in_col);
 
-  void initPartialMatch(DoubleVector& c_val,
-                        DoubleVector& rowScale,
-                        DoubleVector& colScale,
-                        IntVector&    rowReordering,
-                        IntVector&    rev_match_nodes,
-                        BoolVector&   matched,
-                        BoolVector&   rev_matched);
+  void initPartialMatch(DoubleVector&  c_val,
+                        DoubleVector&  rowScale,
+                        DoubleVector&  colScale,
+                        IntVector&     rowReordering,
+                        IntVector&     rev_match_nodes,
+                        BoolVector&    matched,
+                        BoolVector&    rev_matched);
 
   void findShortestAugPath(int            init_node,
                            BoolVector&    matched,
@@ -73,6 +71,7 @@ public:
 // -----------------------------------------------------------------------------
 // Implementation of MC64_UM functions
 // -----------------------------------------------------------------------------
+
 void
 MC64_UM::execute(bool scale)
 {
@@ -372,51 +371,33 @@ MC64_UM::findShortestAugPath(int            init_node,
 void
 MC64_UM::print(std::ostream& o)
 {
-  o << "Dimension: "<<m_n << " NNZ: " << m_nnz << std::endl;
+  o << "Dimension: " << m_n << " NNZ: " << m_nnz << std::endl;
 
-  o << "Row offsets: " << std::endl;
+  o << "\nRow offsets: " << std::endl;
   for (int i = 0; i <= m_n; i++)
     o << m_row_offsets[i] << " ";
-  o << std::endl;
-
-  o << "Column indices: " << std::endl;
+  o << "\nColumn indices: " << std::endl;
   for (int i = 0; i < m_nnz; i++)
     o << m_column_indices[i] << " ";
-  o << std::endl;
-
-  o << "Values: " << std::endl;
+  o << "\nValues: " << std::endl;
   for (int i = 0; i < m_nnz; i++)
     o << m_values[i] << " ";
+
+  if (m_done) {
+    o << "\nRow permutation: " << std::endl;
+    for (int i = 0; i < m_n; i++)
+      o << m_rowPerm[i] << " ";
+
+    o << "\nRow Scale: " << std::endl;
+    for (int i = 0; i < m_n; i++)
+      o << m_rowScale[i] << " ";
+
+    o << "\nColumn Scale: " << std::endl;
+    for (int i = 0; i < m_n; i++)
+      o << m_colScale[i] << " ";
+  }
+
   o << std::endl;
-
-  if (m_done)
-  {
-    o << "Row permutation: " << std::endl;
-    IntVector& rowPerm  = m_rowPerm;
-    for (int i = 0; i < m_n; i++)
-      o << rowPerm[i] << " ";
-    o << std::endl;
-  }
-
-  if (m_done)
-  {
-    o << "Row Scale: " << std::endl;
-    DoubleVector& rowScale = m_rowScale;
-    for (int i = 0; i < m_n; i++)
-      o << rowScale[i] << " ";
-    o << std::endl;
-  }
-
-  if (m_done)
-  {
-    o << "Column Scale: " << std::endl;
-    DoubleVector& colScale = m_colScale;
-    for (int i = 0; i < m_n; i++)
-      o << colScale[i] << " ";
-    o << std::endl;
-  }
-  if (m_done)
-    o << std::endl;
 }
 
 } // end namespace mc64

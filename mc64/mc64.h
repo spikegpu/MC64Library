@@ -130,10 +130,11 @@ class MC64: public MC64_base
 {
 private:
   typedef typename thrust::host_vector<int>       IntVectorH;
-  typedef typename thrust::device_vector<int>     IntVectorD;
   typedef typename thrust::host_vector<double>    DoubleVectorH;
-  typedef typename thrust::device_vector<double>  DoubleVectorD;
   typedef typename thrust::host_vector<bool>      BoolVectorH;
+
+  typedef typename thrust::device_vector<int>     IntVectorD;
+  typedef typename thrust::device_vector<double>  DoubleVectorD;
   typedef typename thrust::device_vector<bool>    BoolVectorD;
 
   IntVectorH     m_row_offsets;
@@ -144,26 +145,27 @@ private:
   DoubleVectorD  m_rowScale;
   DoubleVectorD  m_colScale;
 
-  void formBipartiteGraph(DoubleVectorD &d_c_val, DoubleVectorD &d_max_val_in_col);
+  void formBipartiteGraph(DoubleVectorD&  d_c_val,
+                          DoubleVectorD&  d_max_val_in_col);
 
-  void initPartialMatch(DoubleVectorH& c_val,
-              DoubleVectorH& rowScale,
-              DoubleVectorH& colScale,
-              IntVectorH&    rowReordering,
-              IntVectorH&    rev_match_nodes,
-              BoolVectorH&   matched,
-              BoolVectorH&   rev_matched);
+  void initPartialMatch(DoubleVectorH&  c_val,
+                        DoubleVectorH&  rowScale,
+                        DoubleVectorH&  colScale,
+                        IntVectorH&     rowReordering,
+                        IntVectorH&     rev_match_nodes,
+                        BoolVectorH&    matched,
+                        BoolVectorH&    rev_matched);
 
   void findShortestAugPath(int             init_node,
-               BoolVectorH&    matched,
-               BoolVectorH&    rev_matched,
-               IntVectorH&     match_nodes,
-               IntVectorH&     rev_match_nodes,
-               IntVectorH&     prev,
-               DoubleVectorH&  u_val,
-               DoubleVectorH&  v_val,
-               DoubleVectorH&  c_val,
-               IntVectorH&     irn);
+                           BoolVectorH&    matched,
+                           BoolVectorH&    rev_matched,
+                           IntVectorH&     match_nodes,
+                           IntVectorH&     rev_match_nodes,
+                           IntVectorH&     prev,
+                           DoubleVectorH&  u_val,
+                           DoubleVectorH&  v_val,
+                           DoubleVectorH&  c_val,
+                           IntVectorH&     irn);
 
 public:
   MC64(const IntVectorH&    row_offsets,
@@ -302,7 +304,8 @@ MC64::execute(bool scale)
 }
 
 void
-MC64::formBipartiteGraph(DoubleVectorD &d_c_val, DoubleVectorD &d_max_val_in_col)
+MC64::formBipartiteGraph(DoubleVectorD& d_c_val,
+                         DoubleVectorD& d_max_val_in_col)
 {
   IntVectorD    d_row_offsets  = m_row_offsets;
 
@@ -504,49 +507,27 @@ MC64::print(std::ostream& o)
 {
   o << "Dimension: "<<m_n << " NNZ: " << m_nnz << std::endl;
 
-  o << "Row offsets: " << std::endl;
-  for (int i = 0; i <= m_n; i++)
-    o << m_row_offsets[i] << " ";
-  o << std::endl;
+  o << "\nRow offsets: " << std::endl;
+  thrust::copy(m_row_offsets.begin(), m_row_offsets.end(), std::ostream_iterator<int>(o, " "));
+  o << "\nColumn indices: " << std::endl;
+  thrust::copy(m_column_indices.begin(), m_column_indices.end(), std::ostream_iterator<int>(o, " "));
+  o << "\nValues: " << std::endl;
+  thrust::copy(m_values.begin(), m_values.end(), std::ostream_iterator<double>(o, " "));
 
-  o << "Column indices: " << std::endl;
-  for (int i = 0; i < m_nnz; i++)
-    o << m_column_indices[i] << " ";
-  o << std::endl;
-
-  o << "Values: " << std::endl;
-  for (int i = 0; i < m_nnz; i++)
-    o << m_values[i] << " ";
-  o << std::endl;
-
-  if (m_done)
-  {
-    o << "Row permutation: " << std::endl;
+  if (m_done) {
     IntVectorH rowPerm  = m_rowPerm;
-    for (int i = 0; i < m_n; i++)
-      o << rowPerm[i] << " ";
-    o << std::endl;
-  }
-
-  if (m_done)
-  {
-    o << "Row Scale: " << std::endl;
     DoubleVectorH rowScale = m_rowScale;
-    for (int i = 0; i < m_n; i++)
-      o << rowScale[i] << " ";
-    o << std::endl;
+    DoubleVectorH colScale = m_colScale;
+
+    o << "\nRow permutation: " << std::endl;
+    thrust::copy(rowPerm.begin(), rowPerm.end(), std::ostream_iterator<int>(o, " "));
+    o << "\nRow Scale: " << std::endl;
+    thrust::copy(rowScale.begin(), rowScale.end(), std::ostream_iterator<double>(o, " "));
+    o << "\nColumn Scale: " << std::endl;
+    thrust::copy(colScale.begin(), colScale.end(), std::ostream_iterator<double>(o, " "));
   }
 
-  if (m_done)
-  {
-    o << "Column Scale: " << std::endl;
-    DoubleVectorH colScale = m_colScale;
-    for (int i = 0; i < m_n; i++)
-      o << colScale[i] << " ";
-    o << std::endl;
-  }
-  if (m_done)
-    o << std::endl;
+  o << std::endl;
 }
 
 
